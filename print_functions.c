@@ -11,7 +11,7 @@
 int print_char(va_list ap, params_t *params)
 {
 	char pad_char = ' ';
-	unsigned int pad = l, sum = 0, ch = va_arg(ap, int);
+	unsigned int pad = 1, sum = 0, ch = va_arg(ap, int);
 
 	if (params->minus_flag)
 		sum += _putchar(ch);
