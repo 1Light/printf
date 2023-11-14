@@ -1,83 +1,156 @@
-#include <unistd.h>
 #include "main.h"
-#include <stdio.h>
+#include "handlers.h"
 
+int _printf(const char *format, ...);
 /**
- * buffer_print - print given buffer to stdout
- * @buffer: buffer to print
- * @nbytes: number of bytes to print
- *
- * Return: nbytes
- */
-int buffer_print(char buffer[], unsigned int nbytes)
-{
-	write(1, buffer, nbytes);
-	return (nbytes);
-}
-
-/**
- * buffer_add - adds a string to buffer
- * @buffer: buffer to fill
- * @str: str to add
- * @buffer_pos: pointer to buffer first empty position
- *
- * Return: if buffer filled and emptyed return number of printed char
- * else 0
- */
-int buffer_add(char buffer[], char *str, unsigned int *buffer_pos)
-{
-	int i = 0;
-	unsigned int count = 0, pos = *buffer_pos, size = BUFFER_SIZE;
-
-	while (str && str[i])
-	{
-		if (pos == size)
-		{
-			count += buffer_print(buffer, pos);
-			pos = 0;
-		}
-		buffer[pos++] = str[i++];
-	}
-	*buffer_pos = pos;
-	return (count);
-}
-
-/**
- * _printf - produces output according to a format
- * @format: character string
- *
- * Return: the number of characters printed excluding the null byte
- * used to end output to strings
- */
+* _printf - prints formatted string to
+* the stdout
+* @format: format specifications or option
+* ...: [ARGUMENTS], varaible params
+*
+* Return: count of characters printed
+* Example:
+*    _printf("%c grade (100%%) in %s", 'A', "0x11");
+*    --> A grade (100%) in 0x11
+*/
 int _printf(const char *format, ...)
 {
-	va_list ap;
-	unsigned int i = 0, buffer_pos = 0, count = 0;
-	char *res_str, *aux, buffer[BUFFER_SIZE];
+	short k;
+	bundle b = {{{0}}, {0}, {0}, {0}, {0}, {0}, 0, 0, "", "", NULL, '\0'};
 
-	if (!format || !format[0])
+	void (*handlers[])(bundle *) = {handle_character, handle_integer,
+									handle_natural, handle_string};
+	bzero(b.buffer, WRITE_BUFFER_SIZE);
+	va_start(b.list, format);
+	if (format == NULL)
 		return (-1);
-	va_start(ap, format);
-	aux = malloc(sizeof(char) * 2);
-	while (format && format[i])
+	while (*format)
 	{
-		if (format[i] == '%')
+		init_options(&b.opts);
+		b.cfgs.width_malloc = 0;
+		if (*format == '%')
 		{
-			res_str = treat_format(format, &i, ap);
-			count += buffer_add(buffer, res_str, &buffer_pos);
-			free(res_str);
+			if (*format == 1)
+				return (-1);
+			format++;
+			if (!*format)
+				return (-1);
+			b.cfgs.spec_start = (char *)format;
+			while (*format)
+			{
+				k = b.opts.width + b.opts.precision + b.opts.length;
+				if (strchr(SPECIFIERS, *format) != NULL)
+				{
+					b.opts.conversion = 1;
+					break;
+				}
+				else if (strchr(FLAGS, *format) != NULL)
+				{
+					if (k)
+						break;
+					update_flag(&b.flags, *format);
+					b.opts.flag = 1;
+				}
+				else if ((!k && isdigit(*format)) || (!k && *format == '*'))
+				{
+					if (*format == '*')
+					{
+						format++;
+						b.cfgs.width = va_arg(b.list, int);
+						b.opts.width = 1;
+						continue;
+					}
+					b.tmp = (char *)format++;
+					while (isdigit(*format))
+						format++;
+					bzero(b.conv_buffer, CONV_BUFFER_SIZE);
+					strncpy(b.conv_buffer, b.tmp, format - b.tmp);
+					b.cfgs.width = atoll(b.conv_buffer);
+					b.opts.width = 1;
+					continue;
+				}
+				else if (*format == '.' && !(b.opts.precision + b.opts.length))
+				{
+					b.tmp = (char *) ++format;
+					while (isdigit(*format))
+						format++;
+					if (format - b.tmp > 0)
+					{
+						bzero(b.conv_buffer, CONV_BUFFER_SIZE);
+						strncpy(b.conv_buffer, b.tmp, format - b.tmp);
+						b.cfgs.precision = atoll(b.conv_buffer);
+						b.opts.precision = 1;
+						continue;
+					}
+					break;
+				}
+				else if (strchr(LENGTHS, *format) != NULL && !b.opts.length)
+				{
+					update_length(&b.lengths, *format);
+					b.opts.length = 1;
+				}
+				else
+				{
+					break;
+				}
+				format++;
+			}
+
+			if (!b.opts.conversion)
+			{
+				if (*format)
+				{
+					k = b.opts.conversion + b.opts.length + b.opts.width;
+					k = (k + b.opts.precision) - b.opts.flag;
+					buf_add_ch(b.buffer, &b.cursor, '%', &b.print_counter);
+					if (k == -1)
+						format--;
+					else
+						format = b.cfgs.spec_start;
+				}
+				continue;
+			}
+			b.cur_conv = *format;
+			switch (b.cur_conv)
+			{
+			case 'c':
+				handlers[_character](&b);
+				break;
+			case 's':
+			case 'x':
+			case 'X':
+			case 'p':
+			case 'r':
+			case 'R':
+			case 'S':
+				handlers[_string](&b);
+				break;
+			case '%':
+				buf_add_ch(b.buffer, &b.cursor, b.cur_conv, &b.print_counter);
+				break;
+			case 'd':
+			case 'i':
+				handlers[_integer](&b);
+			break;
+			case 'o':
+			case 'u':
+			case 'b':
+				handlers[_natural](&b);
+				break;
+			default:
+				break;
+			}
 		}
 		else
 		{
-			aux[0] = format[i++];
-			aux[1] = '\0';
-			count += buffer_add(buffer, aux, &buffer_pos);
+			buf_add_ch(b.buffer, &b.cursor, *format, &b.print_counter);
 		}
+		format++;
 	}
-	count += buffer_print(buffer, buffer_pos);
-	free(aux);
-	va_end(ap);
-	if (!count)
-		count = -1;
-	return (count);
+	if (b.cursor > 0)
+	{
+		_write(b.buffer, b.cursor);
+	}
+	va_end(b.list);
+	return (b.print_counter);
 }
