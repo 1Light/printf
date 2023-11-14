@@ -74,7 +74,7 @@ typedef struct specifier
  */
 
 /* _put.c module */
-int _puts(char *str)
+int _puts(char *str);
 int _putchar(int c);
 
 /* print_functions.c module */
