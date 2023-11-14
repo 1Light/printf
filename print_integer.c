@@ -1,43 +1,19 @@
 #include "main.h"
+
 /**
- * print_int - Prints an integer.
- * @args: List of arguments.
- * @b: Buffer array to handle printing.
- * @f: flags that Calculates active flags.
- * @w: Width specification.
- * @p: Precision specification.
- * @s: Size specifier.
+ * print_integer - Print a number in base 10
+ * @list: Number to print in base 10
  *
- * Return: Number of characters printed.
- */
-int print_integer(va_list args, char b[], int f, int w, int p, int s)
+ * Return: Length of th numbers in decimal
+ **/
+int print_integer(va_list list)
 {
-    int i = BUFFER_SIZE - 2;
-    int is_negative = 0;
-    long int n = va_arg(args, long int);
-    unsigned long int num;
+	char *p_buff;
+	int size;
 
-    n =  convert_number_size(n, s);
+	p_buff = itoa(va_arg(list, int), 10);
 
-    if (n == 0)
-        b[i--] = '0';
+	size = print((p_buff != NULL) ? p_buff : "NULL");
 
-    b[BUFFER_SIZE - 1] = '\0';
-    num = (unsigned long int)n;
-
-    if (n < 0)
-    {
-        num = (unsigned long int)((-1) * n);
-        is_negative = 1;
-    }
-
-    while (num > 0)
-    {
-        b[i--] = (num % 10) + '0';
-        num /= 10;
-    }
-
-    i++;
-
-    return (write_number(is_negative, i, b, f, w, p, s));
+	return (size);
 }
